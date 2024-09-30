@@ -294,18 +294,18 @@ func BenchmarkGZIPCompressor1MiB(b *testing.B) {
 	bmCompressor(b, 1024*1024, NewGZIPCompressor())
 }
 
-type MockCompressor struct {
+type mockCompressor struct {
 	DecompressedData []byte
 	ErrDecompress    error
 	Size             int
 	CustomReader     io.Reader
 }
 
-func (m *MockCompressor) Compress(w io.Writer) (io.WriteCloser, error) {
+func (m *mockCompressor) Compress(w io.Writer) (io.WriteCloser, error) {
 	return nil, nil
 }
 
-func (m *MockCompressor) Decompress(r io.Reader) (io.Reader, error) {
+func (m *mockCompressor) Decompress(r io.Reader) (io.Reader, error) {
 	if m.ErrDecompress != nil {
 		return nil, m.ErrDecompress
 	}
@@ -315,11 +315,11 @@ func (m *MockCompressor) Decompress(r io.Reader) (io.Reader, error) {
 	return bytes.NewReader(m.DecompressedData), nil
 }
 
-func (m *MockCompressor) DecompressedSize(compressedBytes mem.BufferSlice) int {
+func (m *mockCompressor) DecompressedSize(compressedBytes mem.BufferSlice) int {
 	return m.Size
 }
 
-func (m *MockCompressor) Name() string {
+func (m *mockCompressor) Name() string {
 	return "mockCompressor"
 }
 
@@ -341,7 +341,7 @@ func TestDecompress(t *testing.T) {
 	}{
 		{
 			name: "Successful decompression",
-			compressor: &MockCompressor{
+			compressor: &mockCompressor{
 				DecompressedData: []byte("decompressed data"),
 				Size:             17,
 			},
@@ -356,7 +356,7 @@ func TestDecompress(t *testing.T) {
 		},
 		{
 			name: "Error during decompression",
-			compressor: &MockCompressor{
+			compressor: &mockCompressor{
 				ErrDecompress: errors.New("decompression error"),
 			},
 			input:                 mem.BufferSlice{},
@@ -367,7 +367,7 @@ func TestDecompress(t *testing.T) {
 		},
 		{
 			name: "Buffer overflow",
-			compressor: &MockCompressor{
+			compressor: &mockCompressor{
 				DecompressedData: []byte("overflow data"),
 				Size:             100,
 			},
@@ -379,7 +379,7 @@ func TestDecompress(t *testing.T) {
 		},
 		{
 			name: "Error during io.Copy",
-			compressor: &MockCompressor{
+			compressor: &mockCompressor{
 				CustomReader: &ErrorReader{},
 			},
 			input:                 mem.BufferSlice{}, // You can fill in the actual input here

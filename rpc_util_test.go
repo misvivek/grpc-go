@@ -345,11 +345,11 @@ func TestDecompress(t *testing.T) {
 				DecompressedData: []byte("decompressed data"),
 				Size:             17,
 			},
-			input:                 mem.BufferSlice{}, // You can fill in the actual input here
+			input:                 mem.BufferSlice{},
 			maxReceiveMessageSize: 100,
 			wantedOutput: func() mem.BufferSlice {
 				decompressed := []byte("decompressed data")
-				return mem.BufferSlice{mem.NewBuffer(&decompressed, nil)} // Taking the address of the slice variable
+				return mem.BufferSlice{mem.NewBuffer(&decompressed, nil)}
 			}(),
 			wantedSize:  1,
 			wantedError: nil,
@@ -372,7 +372,7 @@ func TestDecompress(t *testing.T) {
 				Size:             100,
 			},
 			input:                 mem.BufferSlice{},
-			maxReceiveMessageSize: 5, // Intentionally low to trigger overflow
+			maxReceiveMessageSize: 5,
 			wantedOutput:          nil,
 			wantedSize:            6,
 			wantedError:           errors.New("overflow: message larger than max size receivable by client (5 bytes)"),
@@ -382,7 +382,7 @@ func TestDecompress(t *testing.T) {
 			compressor: &mockCompressor{
 				CustomReader: &ErrorReader{},
 			},
-			input:                 mem.BufferSlice{}, // You can fill in the actual input here
+			input:                 mem.BufferSlice{},
 			maxReceiveMessageSize: 100,
 			wantedOutput:          nil,
 			wantedSize:            0,

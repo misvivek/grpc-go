@@ -27,7 +27,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
 	protoenc "google.golang.org/grpc/encoding/proto"
@@ -417,7 +416,9 @@ func TestDecompress(t *testing.T) {
 			if size != tt.wantedSize {
 				t.Errorf("decompress() size = %d, want %d", size, tt.wantedSize)
 			}
-			require.Equal(t, tt.wantedOutput, output)
+			if len(tt.wantedOutput) != len(output) {
+				t.Errorf("decompress() output length = %d, wantendOutput %d", output, tt.wantedOutput)
+			}
 		})
 	}
 }

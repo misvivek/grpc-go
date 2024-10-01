@@ -408,16 +408,12 @@ func TestDecompress(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			output, size, err := decompress(tt.compressor, tt.input, tt.maxReceiveMessageSize, nil)
-
-			if tt.wantedError != nil {
-				require.EqualError(t, err, tt.wantedError.Error())
-			} else {
-				require.NoError(t, err)
+			if (err != nil) != (tt.wantedError != nil) {
+				t.Errorf("unexpected error state: got err=%v, want err=%v", err, tt.wantedError)
+			} else if err != nil && err.Error() != tt.wantedError.Error() {
+				t.Errorf("unexpected error message: got err=%v, want err=%v", err, tt.wantedError)
 			}
 
-			// if (err != nil) != tt.wantedError {
-			// 	t.Errorf("decompress() error = %v, wantErr %v", err, tt.wantedError)
-			// }
 			if size != tt.wantedSize {
 				t.Errorf("decompress() size = %d, want %d", size, tt.wantedSize)
 			}

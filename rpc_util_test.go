@@ -388,6 +388,21 @@ func TestDecompress(t *testing.T) {
 			wantedSize:            0,
 			wantedError:           errors.New("simulated io.Copy read error"),
 		},
+		{
+			name: "MaxInt64 receive size with small data",
+			compressor: &mockCompressor{
+				DecompressedData: []byte("small data"),
+				Size:             10,
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: math.MaxInt64,
+			wantedOutput: func() mem.BufferSlice {
+				smallDecompressed := []byte("small data")
+				return mem.BufferSlice{mem.NewBuffer(&smallDecompressed, nil)}
+			}(),
+			wantedSize:  1,
+			wantedError: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -400,7 +415,12 @@ func TestDecompress(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, tt.wantedSize, size)
+			// if (err != nil) != tt.wantedError {
+			// 	t.Errorf("decompress() error = %v, wantErr %v", err, tt.wantedError)
+			// }
+			if size != tt.wantedSize {
+				t.Errorf("decompress() size = %d, want %d", size, tt.wantedSize)
+			}
 			require.Equal(t, tt.wantedOutput, output)
 		})
 	}

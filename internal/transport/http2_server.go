@@ -1104,9 +1104,9 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	}
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
 	rst := s.getState() == streamActive
-	// if st.Code() == codes.DeadlineExceeded {
-	// 	rst = true
-	// }
+	if st.Code() == codes.DeadlineExceeded {
+		rst = true
+	}
 	t.finishStream(s, rst, http2.ErrCodeNo, trailingHeader, true)
 	for _, sh := range t.stats {
 		// Note: The trailer fields are compressed with hpack after this call returns.

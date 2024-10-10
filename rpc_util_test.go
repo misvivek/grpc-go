@@ -21,12 +21,14 @@ package grpc
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"math"
 	"reflect"
 	"testing"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/encoding"
 	protoenc "google.golang.org/grpc/encoding/proto"
 	"google.golang.org/grpc/internal/testutils"
 	"google.golang.org/grpc/internal/transport"
@@ -289,4 +291,134 @@ func BenchmarkGZIPCompressor512KiB(b *testing.B) {
 
 func BenchmarkGZIPCompressor1MiB(b *testing.B) {
 	bmCompressor(b, 1024*1024, NewGZIPCompressor())
+}
+
+type mockCompressor struct {
+	DecompressedData []byte
+	ErrDecompress    error
+	Size             int
+	CustomReader     io.Reader
+}
+
+func (m *mockCompressor) Compress(w io.Writer) (io.WriteCloser, error) {
+	return nil, nil
+}
+
+func (m *mockCompressor) Decompress(r io.Reader) (io.Reader, error) {
+	if m.ErrDecompress != nil {
+		return nil, m.ErrDecompress
+	}
+	if m.CustomReader != nil {
+		return m.CustomReader, nil
+	}
+	return bytes.NewReader(m.DecompressedData), nil
+}
+
+func (m *mockCompressor) DecompressedSize(compressedBytes mem.BufferSlice) int {
+	return m.Size
+}
+
+func (m *mockCompressor) Name() string {
+	return "mockCompressor"
+}
+
+type ErrorReader struct{}
+
+func (e *ErrorReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("simulated io.Copy read error")
+}
+
+func TestDecompress(t *testing.T) {
+	tests := []struct {
+		name                  string
+		compressor            encoding.Compressor
+		input                 mem.BufferSlice
+		maxReceiveMessageSize int
+		wantedOutput          mem.BufferSlice
+		wantedSize            int
+		wantedError           error
+	}{
+		{
+			name: "Successful decompression",
+			compressor: &mockCompressor{
+				DecompressedData: []byte("decompressed data"),
+				Size:             17,
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: 100,
+			wantedOutput: func() mem.BufferSlice {
+				decompressed := []byte("decompressed data")
+				return mem.BufferSlice{mem.NewBuffer(&decompressed, nil)}
+			}(),
+			wantedSize:  1,
+			wantedError: nil,
+		},
+		{
+			name: "Error during decompression",
+			compressor: &mockCompressor{
+				ErrDecompress: errors.New("decompression error"),
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: 100,
+			wantedOutput:          nil,
+			wantedSize:            0,
+			wantedError:           errors.New("decompression error"),
+		},
+		{
+			name: "Buffer overflow",
+			compressor: &mockCompressor{
+				DecompressedData: []byte("overflow data"),
+				Size:             100,
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: 5,
+			wantedOutput:          nil,
+			wantedSize:            6,
+			wantedError:           errors.New("overflow: message larger than max size receivable by client (5 bytes)"),
+		},
+		{
+			name: "Error during io.Copy",
+			compressor: &mockCompressor{
+				CustomReader: &ErrorReader{},
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: 100,
+			wantedOutput:          nil,
+			wantedSize:            0,
+			wantedError:           errors.New("simulated io.Copy read error"),
+		},
+		{
+			name: "MaxInt64 receive size with small data",
+			compressor: &mockCompressor{
+				DecompressedData: []byte("small data"),
+				Size:             10,
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: math.MaxInt64,
+			wantedOutput: func() mem.BufferSlice {
+				smallDecompressed := []byte("small data")
+				return mem.BufferSlice{mem.NewBuffer(&smallDecompressed, nil)}
+			}(),
+			wantedSize:  1,
+			wantedError: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, size, err := decompress(tt.compressor, tt.input, tt.maxReceiveMessageSize, nil)
+			if (err != nil) != (tt.wantedError != nil) {
+				t.Errorf("unexpected error state: got err=%v, want err=%v", err, tt.wantedError)
+			} else if err != nil && err.Error() != tt.wantedError.Error() {
+				t.Errorf("unexpected error message: got err=%v, want err=%v", err, tt.wantedError)
+			}
+
+			if size != tt.wantedSize {
+				t.Errorf("decompress() size = %d, want %d", size, tt.wantedSize)
+			}
+			if len(tt.wantedOutput) != len(output) {
+				t.Errorf("decompress() output length = %d, wantendOutput %d", output, tt.wantedOutput)
+			}
+		})
+	}
 }

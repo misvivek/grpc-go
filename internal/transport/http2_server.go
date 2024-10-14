@@ -1104,8 +1104,13 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	}
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
 	rst := s.getState() == streamActive
-	if st.Code() == codes.DeadlineExceeded {
-		rst = true
+	// if st.Code() == codes.DeadlineExceeded {
+	// 	rst = true
+	// }
+	if s.Context().Err() == context.DeadlineExceeded {
+		// Send RST_STREAM frame to abort the stream
+		t.finishStream(s, true, http2.ErrCodeCancel, nil, true)
+		return status.Error(codes.DeadlineExceeded, "Deadline exceeded")
 	}
 	t.finishStream(s, rst, http2.ErrCodeNo, trailingHeader, true)
 	for _, sh := range t.stats {

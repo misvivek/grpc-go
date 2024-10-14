@@ -876,7 +876,7 @@ func decompress(compressor encoding.Compressor, d mem.BufferSlice, maxReceiveMes
 	if err != nil {
 		return nil, 0, err
 	}
-
+	// TODO: Can/should this still be preserved with the new BufferSlice API? Are
 	var out mem.BufferSlice
 	_, err = io.Copy(mem.NewWriter(&out, pool), io.LimitReader(dcReader, int64(maxReceiveMessageSize)))
 	if err != nil {

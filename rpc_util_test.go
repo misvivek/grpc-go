@@ -334,9 +334,9 @@ func TestDecompress(t *testing.T) {
 		compressor            encoding.Compressor
 		input                 mem.BufferSlice
 		maxReceiveMessageSize int
-		wantedOutput          mem.BufferSlice
-		wantedSize            int
-		wantedError           error
+		want                  mem.BufferSlice
+		size                  int
+		error                 error
 	}{
 		{
 			name: "Successful decompression",
@@ -346,12 +346,12 @@ func TestDecompress(t *testing.T) {
 			},
 			input:                 mem.BufferSlice{},
 			maxReceiveMessageSize: 100,
-			wantedOutput: func() mem.BufferSlice {
+			want: func() mem.BufferSlice {
 				decompressed := []byte("decompressed data")
 				return mem.BufferSlice{mem.NewBuffer(&decompressed, nil)}
 			}(),
-			wantedSize:  1,
-			wantedError: nil,
+			size:  1,
+			error: nil,
 		},
 		{
 			name: "Error during decompression",
@@ -360,9 +360,9 @@ func TestDecompress(t *testing.T) {
 			},
 			input:                 mem.BufferSlice{},
 			maxReceiveMessageSize: 100,
-			wantedOutput:          nil,
-			wantedSize:            0,
-			wantedError:           errors.New("decompression error"),
+			want:                  nil,
+			size:                  0,
+			error:                 errors.New("decompression error"),
 		},
 		{
 			name: "Buffer overflow",
@@ -372,20 +372,9 @@ func TestDecompress(t *testing.T) {
 			},
 			input:                 mem.BufferSlice{},
 			maxReceiveMessageSize: 5,
-			wantedOutput:          nil,
-			wantedSize:            6,
-			wantedError:           errors.New("overflow: message larger than max size receivable by client (5 bytes)"),
-		},
-		{
-			name: "Error during io.Copy",
-			compressor: &mockCompressor{
-				CustomReader: &ErrorReader{},
-			},
-			input:                 mem.BufferSlice{},
-			maxReceiveMessageSize: 100,
-			wantedOutput:          nil,
-			wantedSize:            0,
-			wantedError:           errors.New("simulated io.Copy read error"),
+			want:                  nil,
+			size:                  6,
+			error:                 errors.New("overflow: message larger than max size receivable by client (5 bytes)"),
 		},
 		{
 			name: "MaxInt64 receive size with small data",
@@ -395,29 +384,37 @@ func TestDecompress(t *testing.T) {
 			},
 			input:                 mem.BufferSlice{},
 			maxReceiveMessageSize: math.MaxInt64,
-			wantedOutput: func() mem.BufferSlice {
-				smallDecompressed := []byte("small data")
+			want: func() mem.BufferSlice {
+				smallDecompressed := []byte("small data, small data ")
 				return mem.BufferSlice{mem.NewBuffer(&smallDecompressed, nil)}
 			}(),
-			wantedSize:  1,
-			wantedError: nil,
+			size:  1,
+			error: nil,
+		}, {
+			name: "Error during io.Copy",
+			compressor: &mockCompressor{
+				CustomReader: &ErrorReader{},
+			},
+			input:                 mem.BufferSlice{},
+			maxReceiveMessageSize: 100,
+			want:                  nil,
+			size:                  0,
+			error:                 errors.New("simulated io.Copy read error"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			output, size, err := decompress(tt.compressor, tt.input, tt.maxReceiveMessageSize, nil)
-			if (err != nil) != (tt.wantedError != nil) {
-				t.Errorf("unexpected error state: got err=%v, want err=%v", err, tt.wantedError)
-			} else if err != nil && err.Error() != tt.wantedError.Error() {
-				t.Errorf("unexpected error message: got err=%v, want err=%v", err, tt.wantedError)
+			// check both err and tt.error are either nil or non-nil, the condition will be false
+			if (err != nil) != (tt.error != nil) {
+				t.Errorf("unexpected error state: got err=%v, want err=%v", err, tt.error)
 			}
-
-			if size != tt.wantedSize {
-				t.Errorf("decompress() size = %d, want %d", size, tt.wantedSize)
+			if size != tt.size {
+				t.Errorf("decompress() size = %d, want %d", size, tt.size)
 			}
-			if len(tt.wantedOutput) != len(output) {
-				t.Errorf("decompress() output length = %d, wantendOutput %d", output, tt.wantedOutput)
+			if len(tt.want) != len(output) {
+				t.Errorf("decompress() output length = %d, want %d", output, tt.want)
 			}
 		})
 	}

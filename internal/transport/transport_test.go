@@ -2959,3 +2959,21 @@ func (s) TestReadHeaderMultipleBuffers(t *testing.T) {
 		t.Errorf("bytesRead = %d, want = %d", bytesRead, headerLen)
 	}
 }
+
+func TestSetRstAndCallNoop(t *testing.T) {
+	ch := make(chan struct{}, 1)
+	noop = func() {
+		ch <- struct{}{}
+	}
+	var rst bool
+	setRstAndCallNoop(&rst)
+	if !rst {
+		t.Errorf("Want rst to be true, got false")
+	}
+	select {
+	case <-ch:
+		// Success: noop function was called
+	case <-time.After(time.Second):
+		t.Errorf("Expected noop function to be called, but it was not")
+	}
+}

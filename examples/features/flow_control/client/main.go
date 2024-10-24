@@ -87,7 +87,7 @@ func main() {
 
 	// Next, we wait 2 seconds before reading from the stream, to give the
 	// server an opportunity to block while sending its responses.
-	time.Sleep(32 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Finally, read all the data sent by the server to allow it to unblock.
 	for i := 0; true; i++ {

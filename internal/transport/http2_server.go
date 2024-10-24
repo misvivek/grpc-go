@@ -1042,6 +1042,18 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 	return nil
 }
 
+type NoopFunc func()
+
+var noop NoopFunc = func() {
+	// Default noop function does nothing
+}
+
+func setRstAndCallNoop(rst *bool) {
+	*rst = true
+	noop()
+	fmt.Println("called or not in deadlineexceed.")
+}
+
 // WriteStatus sends stream status to the client and terminates the stream.
 // There is no further I/O operations being able to perform on this stream.
 // TODO(zhaoq): Now it indicates the end of entire stream. Revisit if early
@@ -1104,6 +1116,10 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	}
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
 	rst := s.getState() == streamActive
+	if st.Code() == codes.DeadlineExceeded {
+		rst = true
+		setRstAndCallNoop(&rst)
+	}
 	t.finishStream(s, rst, http2.ErrCodeNo, trailingHeader, true)
 	for _, sh := range t.stats {
 		// Note: The trailer fields are compressed with hpack after this call returns.

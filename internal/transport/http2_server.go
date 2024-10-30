@@ -1041,17 +1041,8 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 	}
 	return nil
 }
+func SignalDeadlineExceededForTesting() {
 
-type NoopFunc func()
-
-var noop NoopFunc = func() {
-	// Default noop function does nothing
-}
-
-func setRstAndCallNoop(rst *bool) {
-	*rst = true
-	noop()
-	fmt.Println("called or not in deadlineexceed.")
 }
 
 // WriteStatus sends stream status to the client and terminates the stream.

@@ -47,7 +47,7 @@ func (s *server) BidirectionalStreamingEcho(stream pb.Echo_BidirectionalStreamin
 	log.Printf("New stream began.")
 	// First, we wait 2 seconds before reading from the stream, to give the
 	// client an opportunity to block while sending its requests.
-	time.Sleep(42 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Next, read all the data sent by the client to allow it to unblock.
 	for i := 0; true; i++ {

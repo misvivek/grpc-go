@@ -2983,9 +2983,9 @@ func TestWriteStatus(t *testing.T) {
 	// Define a test stream with fully initialized fields.
 	streamID := uint32(1)
 	s := &Stream{
-		id:             streamID,
-		ctx:            context.Background(), // Set a non-nil context
-		header:         make(map[string][]string),
+		id:  streamID,
+		ctx: context.Background(), // Set a non-nil context
+		// header:         make(map[string][]string),
 		trailer:        make(map[string][]string),
 		state:          streamActive,
 		contentSubtype: "proto",

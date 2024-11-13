@@ -2961,3 +2961,82 @@ func (s) TestReadHeaderMultipleBuffers(t *testing.T) {
 		t.Errorf("bytesRead = %d, want = %d", bytesRead, headerLen)
 	}
 }
+
+// TestWriteStatus verifies the behavior of WriteStatus, including setting headers,
+// sending trailers, and RST_STREAM based on stream state.
+func TestWriteStatus(t *testing.T) {
+	// Set up a fake signal channel to capture when signalDeadlineExceeded is triggered.
+	signalCh := make(chan struct{}, 1)
+	origSignalDeadlineExceeded := signalDeadlineExceeded
+	signalDeadlineExceeded = func() {
+		signalCh <- struct{}{}
+	}
+	defer func() { signalDeadlineExceeded = origSignalDeadlineExceeded }()
+
+	// Create a mock http2Server with fully initialized fields.
+	done := make(chan struct{})
+	defer close(done) // Ensure it’s closed after the test completes.
+
+	tServer := &http2Server{
+		controlBuf: newControlBuffer(done),
+		stats:      nil, // Assuming no stats handler is required for this test
+	}
+
+	// Define a test stream with fully initialized fields.
+	streamID := uint32(1)
+	s := &Stream{
+		id:  streamID,
+		ctx: context.Background(), // Set a non-nil context
+		// header:         make(map[string][]string),
+		trailer:        make(map[string][]string),
+		state:          streamActive,
+		contentSubtype: "proto",
+	}
+
+	// Define a status to be written.
+	st := status.New(codes.DeadlineExceeded, "deadline exceeded")
+
+	// Call WriteStatus with the test stream and status.
+	err := tServer.WriteStatus(s, st)
+	if err != nil {
+		t.Fatalf("WriteStatus failed: %v", err)
+	}
+
+	// Check if grpc-status and grpc-message were added to header fields.
+	hf := s.trailer
+	if got, want := hf[":status"], []string{"200"}; !equalSlices(got, want) {
+		t.Errorf("grpc-status = %v; want %v", got, want)
+	}
+	if got, want := hf["grpc-status"], []string{strconv.Itoa(int(st.Code()))}; !equalSlices(got, want) {
+		t.Errorf("grpc-status = %v; want %v", got, want)
+	}
+	if got, want := hf["grpc-message"], []string{"deadline exceeded"}; !equalSlices(got, want) {
+		t.Errorf("grpc-message = %v; want %v", got, want)
+	}
+
+	// Verify that RST_STREAM was sent when the stream state was active.
+	select {
+	case <-signalCh:
+		// Test passed, signalDeadlineExceeded was invoked.
+	case <-time.After(time.Second):
+		t.Error("signalDeadlineExceeded was not called as expected")
+	}
+
+	// Verify the call to finishStream set the stream as done and cleaned up.
+	if s.getState() != streamDone {
+		t.Errorf("Stream state = %v; want %v", s.getState(), streamDone)
+	}
+}
+
+// Helper function to compare slices for equality.
+func equalSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
